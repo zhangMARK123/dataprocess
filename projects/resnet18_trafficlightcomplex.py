@@ -31,7 +31,7 @@ model = dict(
 )
 # dataset settings
 dataset_type = 'TrafficSubLightcomplexClsDataset'
-dataset_root = '/share/zbh/Datasets/'
+dataset_root = '/disk3/zbh/Datasets/'
 img_norm_cfg = dict(
     mean=[0, 0, 0], std=[255., 255., 255.], to_rgb=True)
 train_pipeline = [
@@ -64,25 +64,24 @@ test_pipeline = [
 ]
 data = dict(
     #sampler=dict(type='ImbalancedDatasetSampler',dataset=dataset),
-    samples_per_gpu=32 * 1,
-    workers_per_gpu=32,
+    samples_per_gpu=32 * 8,
+    workers_per_gpu=256,
     train=dict(
         type=dataset_type,
-        ann_file=dataset_root + "2022_Q1_icu30_new_crop_correct4_zs_train.json",
-        # ann_file=dataset_root + "traffic_light_test.json",
-        # ann_file=dataset_root + "traffic_light_debug.json",
+        ann_file=dataset_root + "2022_Q1_icu30_new_crop_correct5_zs_train.json",
+        
         data_prefix=dataset_root+'2022_Q1_icu30_new_crop2_correct/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=dataset_root + "2022_Q1_icu30_new_crop_correct4_zs_test.json",
+        ann_file=dataset_root + "2022_Q1_icu30_new_crop_correct5_zs_test.json",
         # ann_file=dataset_root + "traffic_light_debug.json",
         data_prefix=dataset_root+'2022_Q1_icu30_new_crop2_correct/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=dataset_root + "2022_Q1_icu30_new_crop_correct4_zs_test.json",
-        data_prefix=dataset_root+'2022_Q1_icu30_new_crop2_correct/' ,
+        ann_file=dataset_root + "2022_Q1_icu30_test_zs_test.json",
+        data_prefix=dataset_root+'2022_Q1_icu30_test_crop/' ,
         pipeline=test_pipeline))
 evaluation = dict(interval=10, metric='accuracy', metric_options={'topk': 1})
 

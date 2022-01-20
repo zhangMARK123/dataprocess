@@ -130,11 +130,11 @@ def analyze_target_list(target_list):
 
     return number_color_dict, number_shape_dict, number_toward_dict,number_character_dict,number_simple_dict
 
-data_root = "/share/zbh/Datasets/2022_Q1_icu30_new/"
-img_write_path="/share/zbh/Datasets/2022_Q1_icu30_new_crop2_correct/"
-train_set_json_file = "../2022_Q1_icu30_new_crop_correct2_zs_train.json"
-test_set_json_file = "../2022_Q1_icu30_new_crop_correct2_zs_test.json"
-debug_set_json_file = "../2022_Q1_icu30_new_crop_correct2_zs_debug.json"
+data_root = "/share/zbh/Datasets/2022_Q1_icu30_test/"
+img_write_path="/share/zbh/Datasets/2022_Q1_icu30_test_crop/"
+train_set_json_file =data_root+ "../2022_Q1_icu30_test_zs_train.json"
+test_set_json_file =data_root+ "../2022_Q1_icu30_test_zs_test.json"
+debug_set_json_file =data_root+ "../22022_Q1_icu30_test_zs_debug.json"
 
 
 card_id_list = []
@@ -162,29 +162,28 @@ for data_card_id in os.listdir(data_root):
                 bbox_ori=object["bbox"]
                 max_w=max(bbox_ori[2],bbox_ori[3])*3
                 bbox_crop=[max(0,bbox_ori[0]-(max_w-bbox_ori[2])/2),max(0,bbox_ori[1]-(max_w-bbox_ori[3])/2),
-                min(bbox_ori[0]+bbox_ori[2]+(max_w-bbox_ori[2])/2+1,1920),min(bbox_ori[1]+bbox_ori[3]+(max_w-bbox_ori[3])/2+1,1080)]
+                min(bbox_ori[0]+bbox_ori[2]+(max_w-bbox_ori[2])/2+1,img.shape[1]),min(bbox_ori[1]+bbox_ori[3]+(max_w-bbox_ori[3])/2+1,img.shape[0])]
                 bbox_crop=list(map(int,bbox_crop))
+                # print(bbox_crop)
+                # print(img.shape)
                 img_crop=img[bbox_crop[1]:bbox_crop[3],bbox_crop[0]:bbox_crop[2],:]
                 cv2.imwrite(os.path.join(img_write_path_card,json_file.split(".")[0]+"_"+str(index_per_img) + ".jpg"),img_crop)
                 if bbox_crop[0]==0:
                     x1=max(bbox_crop[2]-(max_w+bbox_ori[2])/2,0)
                 else:
-                    x1=max((bbox_crop[2]-bbox_crop[0]-bbox_ori[2])/2,0)
+                    x1=max((max_w-bbox_ori[2])/2,0)
                 if bbox_crop[1]==0:
                     y1=max(bbox_crop[3]-(max_w+bbox_ori[3])/2,0)
                 else:
-                    y1=max((bbox_crop[3]-bbox_crop[1]-bbox_ori[3])/2,0)              
-                object["bbox"]=[x1,y1,bbox_ori[2],bbox_ori[3]]
+                    y1=max((max_w-bbox_ori[3])/2,0)              
+                object["bbox"]=[x1,y1,bbox_ori[2],bbox_ori[3]]   
                 
                 #########总筛选 框小于6 遮挡截断的灯箱不计入总数,直接跳过即可,框小于10，只训练颜色朝向简单复杂灯######################
                 if min(object["bbox"][2],object["bbox"][3])<6 or object["ext_occlusion"] == 1 or object["truncation"]==1:
                     continue
                 if min(object["bbox"][2],object["bbox"][3])<10:
-                    object["character_head"] = False
-                    #object["toward_head"] = False
-                    #object["lightboxcolor_head"] = False
+                    object["character_head"] = False                
                     object["lightboxshape_head"] = False
-                    #object["simplelight_head"]=False
                 #因为标签没有灯箱颜色形状是否为简单灯情况，先预设一个。之后只要head为0不影响其训练
                 object["boxcolor"]=5
                 object["boxshape"]=7
@@ -192,7 +191,7 @@ for data_card_id in os.listdir(data_root):
 
                 
                 #若朝向为背面，颜色形状和是否为简单灯都不计入训练。规定都为others方便格式统一，但都不计入训练
-                if object["toward_orientation"]!=0 or object["toward_orientation"]!=1:
+                if object["toward_orientation"]==2 or object["toward_orientation"]==3:
                     object["lightboxcolor_head"] = False
                     object["lightboxshape_head"] = False
                     object["simplelight_head"]=False
@@ -200,23 +199,25 @@ for data_card_id in os.listdir(data_root):
                 #若非通行灯，简单灯head不计入训练，但颜色和形状是否记入训练？？
                 if object["characteristic"]!=0:
                     object["simplelight_head"]=False
-                    object["lightboxcolor_head"] = False
                     object["lightboxshape_head"] = False
+                ###小车需要训练行人灯颜色
+                # if object["characteristic"]!=0 or object["characteristic"]!=1:
+                #      object["lightboxcolor_head"] = False
 
                 ##若子灯个数为0，不加入训练。此类注意重点查看一下             
-                if object["num_sub_lights"]==0 or "sub_lights" not in object.keys():
+                if object["num_sub_lights"]==0:
                     object["lightboxcolor_head"] = False
                     object["lightboxshape_head"] = False
                     object["simplelight_head"]=False
 
                 ################### 1. 判断是看否为简单灯####################################  
                 # 若灯箱颜色只有红黄绿三种一种其余为全黑或者灯箱全黑、未知，则为简单灯，该灯颜色为灯箱颜色，形状为灯箱形状,否则为复杂灯,先不考虑复杂箭头，数据多之后统计复杂箭头类型加类别
-                if object["num_sub_lights"]!=0 and "sub_lights" in object.keys():
+                if object["num_sub_lights"]!=0 and ("sub_lights" in object.keys()):
                     num_color=0
                     subcolor=3
                     subshape=7
                     for sub in object["sub_lights"]:
-                        if sub["color"] in [0,1,2,4]:
+                        if sub["color"] in [0,1,2]:
                             num_color+=1
                             subcolor=sub["color"]
                             if sub["shape"]==0:
@@ -226,9 +227,7 @@ for data_card_id in os.listdir(data_root):
                             elif sub["shape"]==2:
                                 for i,key in enumerate(sub["arrow_orientation"]):
                                     if sub["arrow_orientation"][key]!=0 and i!=5:
-                                        subshape=i+1
-                               
-                            
+                                        subshape=i+1                          
                     if num_color==1 or num_color==0:
                         object["boxcolor"]=subcolor
                         object["boxshape"]=subshape
@@ -294,7 +293,3 @@ if True:
                             "objects": train_object_list}, ensure_ascii=False, indent=4))
     print("deal train set done.")
             
-                
-
-
-

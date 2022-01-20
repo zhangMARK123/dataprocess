@@ -130,11 +130,11 @@ def analyze_target_list(target_list):
 
     return number_color_dict, number_shape_dict, number_toward_dict,number_character_dict,number_simple_dict
 
-data_root = "/share/zbh/Datasets/2022_Q1_icu30_new/"
-img_write_path="/share/zbh/Datasets/2022_Q1_icu30_new_crop3_correct/"
-train_set_json_file =data_root+ "../2022_Q1_icu30_new_crop_correct4_zs_train.json"
-test_set_json_file = data_root+"../2022_Q1_icu30_new_crop_correct4_zs_test.json"
-debug_set_json_file =data_root+ "../2022_Q1_icu30_new_crop_correct4_zs_debug.json"
+data_root = "/share/zbh/Datasets/2022_Q1_icu30_test/"
+img_write_path="/share/zbh/Datasets/2022_Q1_icu30_test_crop/"
+train_set_json_file =data_root+ "../2022_Q1_icu30_test_zs_train.json"
+test_set_json_file =data_root+ "../2022_Q1_icu30_test_zs_test.json"
+debug_set_json_file =data_root+ "../22022_Q1_icu30_test_zs_debug.json"
 
 
 card_id_list = []
@@ -146,7 +146,9 @@ for data_card_id in os.listdir(data_root):
             sample_json = json.load(f)
             img_name=json_file.split(".")[0]+".jpg"
             images_path=os.path.join(os.path.join(data_root, data_card_id, "images", img_name))
-            index_per_img=0           
+            index_per_img=0     
+            imgw=sample_json["width"]
+            imgh=sample_json["height"]      
             for object in sample_json["objects"]:
                 object["character_head"] = True
                 object["toward_head"] = True
@@ -157,9 +159,9 @@ for data_card_id in os.listdir(data_root):
                 bbox_ori=object["bbox"]
                 max_w=max(bbox_ori[2],bbox_ori[3])*3
                 bbox_crop=[max(0,bbox_ori[0]-(max_w-bbox_ori[2])/2),max(0,bbox_ori[1]-(max_w-bbox_ori[3])/2),
-                min(bbox_ori[0]+bbox_ori[2]+(max_w-bbox_ori[2])/2+1,1920),min(bbox_ori[1]+bbox_ori[3]+(max_w-bbox_ori[3])/2+1,1080)]
+                min(bbox_ori[0]+bbox_ori[2]+(max_w-bbox_ori[2])/2+1,imgw),min(bbox_ori[1]+bbox_ori[3]+(max_w-bbox_ori[3])/2+1,imgh)]
                 bbox_crop=list(map(int,bbox_crop))
-                #img_crop=img[bbox_crop[1]:bbox_crop[3],bbox_crop[0]:bbox_crop[2],:]
+                
                 
                 if bbox_crop[0]==0:
                     x1=max(bbox_crop[2]-(max_w+bbox_ori[2])/2,0)
@@ -188,7 +190,7 @@ for data_card_id in os.listdir(data_root):
                     object["lightboxshape_head"] = False
                     object["simplelight_head"]=False
                     object["character_head"]=False
-                #若非通行灯，简单灯head不计入训练，但颜色和形状是否记入训练？？
+                #若非通行灯，简单灯head不计入训练，但颜色和形状是否记入训练？？颜色计入训练
                 if object["characteristic"]!=0:
                     object["simplelight_head"]=False
                     object["lightboxshape_head"] = False

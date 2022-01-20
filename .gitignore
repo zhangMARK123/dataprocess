@@ -123,3 +123,6 @@ venv.bak/
 
 # Pytorch
 *.pth
+
+*.json
+*.txt

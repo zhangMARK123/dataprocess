@@ -160,7 +160,7 @@ def evalresult(labelpath,wpath):
         print(SIMPLE_CLASSES[i]," pricious is :",precious) 
 
 
-labelpath="../result.json"
+labelpath="../result_QA.json"
 wpath="evalresult.json"
 
 evalresult(labelpath,wpath)
