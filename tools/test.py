@@ -11,7 +11,7 @@ from mmcv import DictAction
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import get_dist_info, init_dist, load_checkpoint
 
-from mmcls.apis import multi_gpu_test, single_gpu_test
+from mmcls.apis import multi_gpu_test, single_gpu_test,single_gpu_test_sublights
 from mmcls.datasets import build_dataloader, build_dataset
 from mmcls.models import build_classifier
 
@@ -169,7 +169,7 @@ def main():
             model = MMDataParallel(model, device_ids=[0])
         model.CLASSES = CLASSES
         show_kwargs = {} if args.show_options is None else args.show_options
-        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
+        outputs = single_gpu_test_sublights(model, data_loader, args.show, args.show_dir,
                                   **show_kwargs)
     else:
         model = MMDistributedDataParallel(

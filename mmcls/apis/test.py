@@ -11,7 +11,7 @@ import torch
 import torch.distributed as dist
 from mmcv.image import tensor2imgs
 from mmcv.runner import get_dist_info
-
+import json
 
 def single_gpu_test(model,
                     data_loader,
@@ -67,7 +67,154 @@ def single_gpu_test(model,
         for _ in range(batch_size):
             prog_bar.update()
     return results
+def single_gpu_test_sublights(model,
+                    data_loader,
+                    show=False,
+                    out_dir=None,
+                    result_dir=None,
+                    **show_kwargs):
+    model.eval()
+    results = []
+    outputs=[]
+    dataset = data_loader.dataset
+    prog_bar = mmcv.ProgressBar(len(dataset))
+    for i, data in enumerate(data_loader):
+        with torch.no_grad():
+            result = model(return_loss=False, **data)
 
+        batch_size = len(result)
+        results.extend(result)
+       
+        
+
+        if show or out_dir:
+            scores = np.vstack(result)
+            color_scores = scores[:, :len(dataset.COLOR_CLASSES)]
+            pred_color_score = np.max(color_scores, axis=1)
+            pred_color_label = np.argmax(color_scores, axis=1)
+            pred_color_class = [dataset.COLOR_CLASSES[lb] for lb in pred_color_label]
+            assert color_scores.shape[1] == len(dataset.COLOR_CLASSES)
+
+            shape_scores = scores[:, len(data_loader.dataset.COLOR_CLASSES):len(data_loader.dataset.COLOR_CLASSES)+len(data_loader.dataset.SHAPE_CLASSES)]
+            pred_shape_score = np.max(shape_scores, axis=1)
+            pred_shape_label = np.argmax(shape_scores, axis=1)
+            pred_shape_class = [data_loader.dataset.SHAPE_CLASSES[lb] for lb in pred_shape_label]
+            assert shape_scores.shape[1] == len(dataset.SHAPE_CLASSES)
+
+            toward_scores = scores[:, len(data_loader.dataset.COLOR_CLASSES)+len(data_loader.dataset.SHAPE_CLASSES):len(data_loader.dataset.COLOR_CLASSES)+len(data_loader.dataset.SHAPE_CLASSES)+len(data_loader.dataset.TOWARD_CLASSES)]
+            pred_toward_score = np.max(toward_scores, axis=1)
+            pred_toward_label = np.argmax(toward_scores, axis=1)
+            pred_toward_class = [dataset.TOWARD_CLASSES[lb] for lb in pred_toward_label]
+            assert toward_scores.shape[1] == len(dataset.TOWARD_CLASSES)
+
+            character_scores = scores[:, len(data_loader.dataset.COLOR_CLASSES)+len(data_loader.dataset.SHAPE_CLASSES)+len(data_loader.dataset.TOWARD_CLASSES):-len(data_loader.dataset.SIMPLE_CLASSES)]
+            pred_character_score = np.max(character_scores, axis=1)
+            pred_character_label = np.argmax(character_scores, axis=1)
+            pred_character_class = [dataset.CHARACTER_CLASSES[lb] for lb in pred_character_label]
+            assert character_scores.shape[1] == len(dataset.CHARACTER_CLASSES)
+
+            simplelight_scores = scores[:, -len(data_loader.dataset.SIMPLE_CLASSES):]
+            pred_simplelight_score = np.max(simplelight_scores, axis=1)
+            pred_simplelight_label = np.argmax(simplelight_scores, axis=1)
+            pred_simplelight_class = [dataset.SIMPLE_CLASSES[lb] for lb in pred_simplelight_label]
+            assert simplelight_scores.shape[1] == len(dataset.SIMPLE_CLASSES)
+
+            img_metas = data['img_metas'].data[0]
+            imgs = tensor2imgs(data['img'], **img_metas[0]['img_norm_cfg'])
+            assert len(imgs) == len(img_metas)
+
+            for i, (img, img_meta) in enumerate(zip(imgs, img_metas)):
+                h, w, _ = img_meta['img_shape']
+                img_show = img[:h, :w, :]
+
+                ori_h, ori_w = img_meta['ori_shape'][:-1]
+                img_show = mmcv.imresize(img_show, (ori_w, ori_h))
+
+                if out_dir:
+                    out_file = osp.join(out_dir, img_meta['ori_filename'])
+                else:
+                    out_file = None
+
+                result_show = {}
+                result_output={}
+                SHOW_FLAG = False
+                
+                if img_meta['lightboxcolor_head']:
+                    # result_show["score_color_pred"] = pred_color_score[i]
+                    result_show["label_color_pred"] = pred_color_label[i]
+                    result_show["label_color_gt"] = img_meta['boxcolor']
+                    if result_show["label_color_pred"] != result_show["label_color_gt"]:
+                        SHOW_FLAG = True
+                if img_meta['lightboxshape_head']:
+                    # result_show["score_shape_pred"] = pred_shape_score[i]
+                    result_show["label_shape_pred"] = pred_shape_label[i]
+                    result_show["label_shape_gt"] = img_meta['boxshape']
+                    if result_show["label_shape_pred"] != result_show["label_shape_gt"]:
+                        SHOW_FLAG = True
+                
+                if img_meta['character_head']:
+                    # result_show["score_character_pred"] = pred_character_score[i]
+                    result_show["label_character_pred"] = pred_character_label[i]
+                    result_show["label_character_gt"] = img_meta['characteristic']
+                    if result_show["label_character_pred"] != result_show["label_character_gt"]:
+                        SHOW_FLAG = True
+                if img_meta['toward_head']:
+                    # result_show["score_toward_pred"] = pred_toward_score[i]
+                    result_show["label_toward_pred"] = pred_toward_label[i]
+                    result_show["label_toward_gt"] = img_meta['toward_orientation']
+                    if result_show["label_toward_pred"] != result_show["label_toward_gt"]:
+                    #if result_show["label_toward_pred"] == result_show["label_toward_gt"] == 0:
+                        SHOW_FLAG = True
+                if img_meta['simplelight_head']:
+                    # result_show["score_simplelight_pred"] = pred_simplelight_score[i]
+                    result_show["label_simplelight_pred"] = pred_simplelight_label[i]
+                    result_show["label_simplelight_gt"] = img_meta['simplelight']
+                    if result_show["label_simplelight_pred"] != result_show["label_simplelight_gt"]:
+                    #if result_show["label_toward_pred"] == result_show["label_toward_gt"] == 0:
+                        SHOW_FLAG = True
+                ####将结果输出
+                result_output['simplelight_head']=img_meta['simplelight_head']
+                result_output['toward_head']=img_meta['toward_head']
+                result_output['character_head']=img_meta['character_head']
+                result_output['lightboxshape_head']=img_meta['lightboxshape_head']
+                result_output['lightboxcolor_head']=img_meta['lightboxcolor_head']
+                result_output["imgname"]=img_meta['ori_filename']
+                result_output["score_color_pred"] = pred_color_score[i]
+                result_output["label_color_pred"] = pred_color_label[i]
+                result_output["label_color_gt"] = img_meta['boxcolor']             
+                result_output["score_shape_pred"] = pred_shape_score[i]
+                result_output["label_shape_pred"] = pred_shape_label[i]
+                result_output["label_shape_gt"] = img_meta['boxshape']    
+                result_output["score_character_pred"] = pred_character_score[i]
+                result_output["label_character_pred"] = pred_character_label[i]
+                result_output["label_character_gt"] = img_meta['characteristic']    
+                result_output["score_toward_pred"] = pred_toward_score[i]
+                result_output["label_toward_pred"] = pred_toward_label[i]
+                result_output["label_toward_gt"] = img_meta['toward_orientation']         
+                result_output["score_simplelight_pred"] = pred_simplelight_score[i]
+                result_output["label_simplelight_pred"] = pred_simplelight_label[i]
+                result_output["label_simplelight_gt"] = img_meta['simplelight']                   
+                for key in result_output.keys():
+                    result_output[key]=str(result_output[key])
+                outputs.append(result_output)
+                if SHOW_FLAG:   # and img_meta['toward_head']:
+                    model.module.show_result(
+                        img,
+                        result_show,
+                        font_scale=0.3,
+                        show=show,
+                        out_file=out_file,
+                        **show_kwargs)
+
+        batch_size = data['img'].size(0)
+        for _ in range(batch_size):
+            prog_bar.update()
+    
+
+    if result_dir:     
+        with open(result_dir, 'w+') as f:
+            json.dump({'objects':outputs},f)
+    return results
 
 def multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
     """Test model with multiple gpus.

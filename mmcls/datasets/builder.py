@@ -93,6 +93,10 @@ def build_dataloader(dataset,
             sampler_cfg,
             default_args=dict(
                 dataset=dataset, num_replicas=world_size, rank=rank))
+        sampler = build_sampler(
+            sampler_cfg,
+            default_args=dict(
+                dataset=dataset, num_replicas=world_size, rank=rank))
     # Default sampler logic
     elif dist:
         sampler = build_sampler(
@@ -105,7 +109,7 @@ def build_dataloader(dataset,
                 round_up=round_up))
     else:
         sampler = None
-
+        #sampler=build_sampler(dict(type='ImbalancedDatasetSampler',dataset=dataset))
     # If sampler exists, turn off dataloader shuffle
     if sampler is not None:
         shuffle = False
