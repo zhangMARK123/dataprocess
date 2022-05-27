@@ -10,6 +10,7 @@ from .image import ImageClassifier
 class MultiHeadClassifier(ImageClassifier):
 
     def forward_train(self, img, **kwargs):
+        
         x = self.extract_feat(img)
         
         losses = dict()

@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-
+import torch
 import torch.nn as nn
 import torch.utils.checkpoint as cp
 from mmcv.cnn import (ConvModule, build_conv_layer, build_norm_layer,
@@ -457,8 +457,10 @@ class ResNet(BaseBackbone):
     def __init__(self,
                  depth,
                  in_channels=3,
-                 stem_channels=64,
-                 base_channels=64,
+                 stem_channels=32,
+                 base_channels=32,
+                #  stem_channels=16,
+                #  base_channels=16,
                  expansion=None,
                  num_stages=4,
                  strides=(1, 2, 2, 2),
@@ -625,6 +627,9 @@ class ResNet(BaseBackbone):
                     constant_init(m.norm2, 0)
 
     def forward(self, x):
+        # img = x[:, :, :, [2, 1, 0]]
+        # img = img.permute(0, 3, 1, 2)
+        # x = (img / 255.)
         if self.deep_stem:
             x = self.stem(x)
         else:
@@ -636,7 +641,14 @@ class ResNet(BaseBackbone):
         for i, layer_name in enumerate(self.res_layers):
             res_layer = getattr(self, layer_name)
             x = res_layer(x)
+            # if i==0:
+            #     # x_temp1=x    
+            #     print(x.shape)          
             if i in self.out_indices:
+                # print(x.shape)
+                # y=nn.UpsamplingNearest2d(scale_factor=8)(x)
+                # z=torch.cat((x_temp1,y),1)
+                # w=nn.Conv2d(576,512,(1,1)).cuda()(z)               
                 outs.append(x)
         return tuple(outs)
 

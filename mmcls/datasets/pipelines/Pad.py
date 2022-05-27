@@ -112,8 +112,10 @@ class ResizeAndPad(object):
             img_height = img.shape[0]
             img_width = img.shape[1]
             if img_height < 4 or img_width < 4:
+                print(results["img_info"])
                 print("img_height or img_width should above 4 pixel.")
-            assert img_height >= 4 and img_width >= 4, "img_height or img_width should above 4 pixel."
+            # assert img_height >= 4 and img_width >= 4, "img_height or img_width should above 4 pixel."
+            assert img_height >= 4 and img_width >= 4, results["img_info"]
             longer_side = max(img_height, img_width)
             resize_factor = self.size / longer_side
             resize_height = int(np.round(img_height * resize_factor))

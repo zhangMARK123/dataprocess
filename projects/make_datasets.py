@@ -1,5 +1,5 @@
 import os, json, random, cv2
-
+import math
 def analyze_target_list(target_list):
 
     CHARACTER_pass=CHARACTER_president=CHARACTER_number=CHARACTER_word=CHARACTER_others=CHARACTER_unknow=0
@@ -130,17 +130,19 @@ def analyze_target_list(target_list):
 
     return number_color_dict, number_shape_dict, number_toward_dict,number_character_dict,number_simple_dict
 
-data_root = "/share/zbh/Datasets/2022_Q1_icu30_test/"
-img_write_path="/share/zbh/Datasets/2022_Q1_icu30_test_crop/"
-train_set_json_file =data_root+ "../2022_Q1_icu30_test_zs_train.json"
-test_set_json_file =data_root+ "../2022_Q1_icu30_test_zs_test.json"
-debug_set_json_file =data_root+ "../22022_Q1_icu30_test_zs_debug.json"
-
+data_root = "/disk3/zbh/Datasets/2022_Q1_icu30_test/"
+train_set_json_file =data_root+ "../2022_Q1_icu30_111.json"
+test_set_json_file =data_root+ "../2022_Q1_icu30_test_moni111.json"
+debug_set_json_file =data_root+ "../2022_Q1_icu30_test_debug_moni111.json"
+img_write_path="/disk3/zbh/Datasets/2022_Q1_icu30_test_crop/"
 
 card_id_list = []
 object_list = []
 OBJECT_COUNT = 0
-for data_card_id in os.listdir(data_root):     
+
+for data_card_id in os.listdir(data_root): 
+    if data_card_id not in ["6212f808c4792a209de728e8"]:
+        continue
     img_write_path_card=os.path.join(img_write_path,data_card_id,"images")
     if not os.path.exists(img_write_path_card):
         os.makedirs(img_write_path_card)   
@@ -149,6 +151,8 @@ for data_card_id in os.listdir(data_root):
             sample_json = json.load(f)
             img_name=json_file.split(".")[0]+".jpg"
             images_path=os.path.join(os.path.join(data_root, data_card_id, "images", img_name))
+            if not os.path.exists(images_path):
+                continue
             img=cv2.imread(images_path)
             index_per_img=0           
             for object in sample_json["objects"]:
@@ -160,92 +164,95 @@ for data_card_id in os.listdir(data_root):
                 
                 ########################先对图像进行裁剪并保存,并对齐新框位置#####################
                 bbox_ori=object["bbox"]
-                max_w=max(bbox_ori[2],bbox_ori[3])*3
-                bbox_crop=[max(0,bbox_ori[0]-(max_w-bbox_ori[2])/2),max(0,bbox_ori[1]-(max_w-bbox_ori[3])/2),
-                min(bbox_ori[0]+bbox_ori[2]+(max_w-bbox_ori[2])/2+1,img.shape[1]),min(bbox_ori[1]+bbox_ori[3]+(max_w-bbox_ori[3])/2+1,img.shape[0])]
-                bbox_crop=list(map(int,bbox_crop))
-                # print(bbox_crop)
-                # print(img.shape)
+                if(bbox_ori[2]<0 or bbox_ori[3]<0):
+                    continue
+                max_w = math.ceil(max(bbox_ori[2], bbox_ori[3]) * 3)
+                bbox_crop = [max(0, bbox_ori[0] - (max_w - bbox_ori[2]) / 2),
+                             max(0, bbox_ori[1] - (max_w - bbox_ori[3]) / 2),
+                             min(bbox_ori[0] + bbox_ori[2] + (max_w - bbox_ori[2]) / 2 + 1, img.shape[1]),
+                             min(bbox_ori[1] + bbox_ori[3] + (max_w - bbox_ori[3]) / 2 + 1, img.shape[0])]
+                bbox_crop = list(map(int, bbox_crop))
+                
                 img_crop=img[bbox_crop[1]:bbox_crop[3],bbox_crop[0]:bbox_crop[2],:]
                 cv2.imwrite(os.path.join(img_write_path_card,json_file.split(".")[0]+"_"+str(index_per_img) + ".jpg"),img_crop)
-                if bbox_crop[0]==0:
-                    x1=max(bbox_crop[2]-(max_w+bbox_ori[2])/2,0)
+                if bbox_crop[0] == 0:
+                    x1 = max(bbox_crop[2] - (max_w + bbox_ori[2]) / 2, 0)
                 else:
-                    x1=max((max_w-bbox_ori[2])/2,0)
-                if bbox_crop[1]==0:
-                    y1=max(bbox_crop[3]-(max_w+bbox_ori[3])/2,0)
+                    x1 = max((max_w - bbox_ori[2]) / 2, 0)
+                if bbox_crop[1] == 0:
+                    y1 = max(bbox_crop[3] - (max_w + bbox_ori[3]) / 2, 0)
                 else:
-                    y1=max((max_w-bbox_ori[3])/2,0)              
-                object["bbox"]=[x1,y1,bbox_ori[2],bbox_ori[3]]   
-                
+                    y1 = max((max_w - bbox_ori[3]) / 2, 0)  
+                object["bbox"] = [x1, y1, bbox_ori[2], bbox_ori[3]]  # 框在子图的坐标
                 #########总筛选 框小于6 遮挡截断的灯箱不计入总数,直接跳过即可,框小于10，只训练颜色朝向简单复杂灯######################
-                if min(object["bbox"][2],object["bbox"][3])<6 or object["ext_occlusion"] == 1 or object["truncation"]==1:
-                    continue
-                if min(object["bbox"][2],object["bbox"][3])<10:
-                    object["character_head"] = False                
-                    object["lightboxshape_head"] = False
-                #因为标签没有灯箱颜色形状是否为简单灯情况，先预设一个。之后只要head为0不影响其训练
-                object["boxcolor"]=5
-                object["boxshape"]=7
-                object["simplelight"]=0   
+                # if min(object["bbox"][2], object["bbox"][3]) < 14 or object["ext_occlusion"] == 1 or object[
+                #     "truncation"] == 1:
+                #     continue
+                # if min(object["bbox"][2], object["bbox"][3]) < 14:
+                #     object["character_head"] = False
+                #     object["lightboxshape_head"] = False
+                # 因为标签没有灯箱颜色形状是否为简单灯情况，先预设一个。之后只要head为0不影响其训练
+                object["boxcolor"] = 5
+                object["boxshape"] = 7
+                object["simplelight"] = 0  # 默认简单灯
 
-                
-                #若朝向为背面，颜色形状和是否为简单灯都不计入训练。规定都为others方便格式统一，但都不计入训练
-                if object["toward_orientation"]==2 or object["toward_orientation"]==3:
+                # 若朝向为背面，颜色形状和是否为简单灯都不计入训练。规定都为others方便格式统一，但都不计入训练
+                if object["toward_orientation"] == 2 or object["toward_orientation"] == 3:
                     object["lightboxcolor_head"] = False
                     object["lightboxshape_head"] = False
-                    object["simplelight_head"]=False
-                    object["character_head"]=False
-                #若非通行灯，简单灯head不计入训练，但颜色和形状是否记入训练？？
-                if object["characteristic"]!=0:
-                    object["simplelight_head"]=False
+                    object["simplelight_head"] = False
+                    object["character_head"] = False
+                # 若非通行灯，简单灯head不计入训练，但颜色和形状是否记入训练？？颜色计入训练
+                if object["characteristic"] != 0:
+                    object["simplelight_head"] = False
                     object["lightboxshape_head"] = False
                 ###小车需要训练行人灯颜色
                 # if object["characteristic"]!=0 or object["characteristic"]!=1:
                 #      object["lightboxcolor_head"] = False
 
-                ##若子灯个数为0，不加入训练。此类注意重点查看一下             
-                if object["num_sub_lights"]==0:
+                ##若子灯个数为0，不加入训练。此类注意重点查看一下
+                if object["num_sub_lights"] == 0:
                     object["lightboxcolor_head"] = False
                     object["lightboxshape_head"] = False
-                    object["simplelight_head"]=False
+                    # if max(object["bbox"][2], object["bbox"][3]) / min(object["bbox"][2], object["bbox"][3]) < 3.5:
+                    #     object["simplelight_head"] = False
 
-                ################### 1. 判断是看否为简单灯####################################  
+                ################### 1. 判断是看否为简单灯####################################
                 # 若灯箱颜色只有红黄绿三种一种其余为全黑或者灯箱全黑、未知，则为简单灯，该灯颜色为灯箱颜色，形状为灯箱形状,否则为复杂灯,先不考虑复杂箭头，数据多之后统计复杂箭头类型加类别
-                if object["num_sub_lights"]!=0 and ("sub_lights" in object.keys()):
-                    num_color=0
-                    subcolor=3
-                    subshape=7
+                if object["num_sub_lights"] != 0 and ("sub_lights" in object.keys()):
+                    num_color = 0
+                    subcolor = 3
+                    subshape = 7
                     for sub in object["sub_lights"]:
-                        if sub["color"] in [0,1,2]:
-                            num_color+=1
-                            subcolor=sub["color"]
-                            if sub["shape"]==0:
-                                subshape=0
-                            elif sub["shape"]==1:
-                                subshape=6
-                            elif sub["shape"]==2:
-                                for i,key in enumerate(sub["arrow_orientation"]):
-                                    if sub["arrow_orientation"][key]!=0 and i!=5:
-                                        subshape=i+1                          
-                    if num_color==1 or num_color==0:
-                        object["boxcolor"]=subcolor
-                        object["boxshape"]=subshape
-                        object["simplelight"]=0
+                        if sub["color"] in [0, 1, 2]:
+                            num_color += 1
+                            subcolor = sub["color"]
+                            if sub["shape"] == 0:
+                                subshape = 0
+                            elif sub["shape"] == 1:     # 非机动车
+                                subshape = 6
+                            elif sub["shape"] == 2:
+                                for i, key in enumerate(sub["arrow_orientation"]):
+                                    if sub["arrow_orientation"][key] != 0 and i != 5:       # i 不可能等于5
+                                        subshape = i + 1
+                    if num_color == 1 or num_color == 0:    # 只有一个子灯，或者全部unknown，全部黑。有个问题，有没有可能子灯颜色全部标注unknown
+                        object["boxcolor"] = subcolor
+                        object["boxshape"] = subshape
+                        object["simplelight"] = 0
                     else:
                         object["lightboxcolor_head"] = False
                         object["lightboxshape_head"] = False
-                        object["simplelight"]=1
+                        object["simplelight"] = 1
                 OBJECT_COUNT += 1
                 object["id"] = '{:0>10d}'.format(OBJECT_COUNT)
-                object["img_info"] = {'filename': "images/" + json_file.split(".")[0]+"_"+str(index_per_img) + ".jpg"}
-                
-                index_per_img+=1
+                object["img_info"] = {
+                    'filename': "images/" + json_file.split(".")[0] + "_" + str(index_per_img) + ".jpg"}
+
+                index_per_img += 1
                 object["data_card_id"] = data_card_id
                 object_list.append(object)
-                card_id_list.append(data_card_id)                 
-
-card_id_list = list(set(card_id_list))              
+                card_id_list.append(data_card_id)
+card_id_list = list(set(card_id_list))
 if True:
     ###数据集2/8分为训练集测试集
     random.shuffle(object_list)
@@ -259,37 +266,39 @@ if True:
             test_object_list.append(object)
     print("number of train set : ", len(train_object_list))
     print("number of test set : ", len(test_object_list))
-    number_color_dict, number_shape_dict, number_toward_dict,number_character_dict,number_simple_dict=analyze_target_list(test_object_list)
-    with open(debug_set_json_file, 'w+') as f:
+    number_color_dict, number_shape_dict, number_toward_dict, number_character_dict, number_simple_dict = analyze_target_list(
+        test_object_list)
+    with open(debug_set_json_file,'w+') as f:
         f.write(json.dumps({"card_id": card_id_list,
                             "postscript": "Delete targets with a width less than 4 pixels.",
-                            "number_color_dict":number_color_dict,
-                            "number_shape_dict":number_shape_dict,
-                            "number_toward_dict":number_toward_dict,
-                            "number_character_dict":number_character_dict,
-                            "number_simple_dict":number_simple_dict,
-                            "objects": test_object_list[:int(0.01 * len(test_object_list))]}, ensure_ascii=False, indent=4))
+                            "number_color_dict": number_color_dict,
+                            "number_shape_dict": number_shape_dict,
+                            "number_toward_dict": number_toward_dict,
+                            "number_character_dict": number_character_dict,
+                            "number_simple_dict": number_simple_dict,
+                            "objects": test_object_list[:int(0.01 * len(test_object_list))]}, ensure_ascii=False,
+                           indent=4))
     print("deal debug set done.")
 
-    with open(test_set_json_file, 'w+') as f:
+    with open(test_set_json_file,'w+') as f:
         f.write(json.dumps({"card_id": card_id_list,
                             "postscript": "Delete targets with a width less than 4 pixels.",
-                            "number_color_dict":number_color_dict,
-                            "number_shape_dict":number_shape_dict,
-                            "number_toward_dict":number_toward_dict,
-                            "number_character_dict":number_character_dict,
-                            "number_simple_dict":number_simple_dict,
+                            "number_color_dict": number_color_dict,
+                            "number_shape_dict": number_shape_dict,
+                            "number_toward_dict": number_toward_dict,
+                            "number_character_dict": number_character_dict,
+                            "number_simple_dict": number_simple_dict,
                             "objects": test_object_list}, ensure_ascii=False, indent=4))
     print("deal test set done.")
-    number_color_dict, number_shape_dict, number_toward_dict,number_character_dict,number_simple_dict=analyze_target_list(train_object_list)
-    with open(train_set_json_file, 'w+') as f:
+    number_color_dict, number_shape_dict, number_toward_dict, number_character_dict, number_simple_dict = analyze_target_list(
+        train_object_list)
+    with open(train_set_json_file,'w+') as f:
         f.write(json.dumps({"card_id": card_id_list,
                             "postscript": "Delete targets with a width less than 6 pixels.",
-                            "number_color_dict":number_color_dict,
-                            "number_shape_dict":number_shape_dict,
-                            "number_toward_dict":number_toward_dict,
-                            "number_character_dict":number_character_dict,
-                            "number_simple_dict":number_simple_dict,
+                            "number_color_dict": number_color_dict,
+                            "number_shape_dict": number_shape_dict,
+                            "number_toward_dict": number_toward_dict,
+                            "number_character_dict": number_character_dict,
+                            "number_simple_dict": number_simple_dict,
                             "objects": train_object_list}, ensure_ascii=False, indent=4))
     print("deal train set done.")
-            

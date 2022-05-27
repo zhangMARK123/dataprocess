@@ -15,7 +15,7 @@ from ..builder import PIPELINES
 @PIPELINES.register_module()
 class CropByBbox(object):
 
-    def __init__(self, expand_prob=0.3, expand_ratio=0.1, save_crop_result=False):
+    def __init__(self, expand_prob=0, expand_ratio=0.1, save_crop_result=False):
         assert 0 <= expand_prob <= 1
         self.expand_prob = expand_prob
         self.expand_ratio = expand_ratio

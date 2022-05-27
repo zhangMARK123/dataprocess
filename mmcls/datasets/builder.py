@@ -26,6 +26,7 @@ SAMPLERS = Registry('sampler')
 def build_dataset(cfg, default_args=None):
     from .dataset_wrappers import (ConcatDataset, RepeatDataset,
                                    ClassBalancedDataset)
+   
     if isinstance(cfg, (list, tuple)):
         dataset = ConcatDataset([build_dataset(c, default_args) for c in cfg])
     elif cfg['type'] == 'RepeatDataset':
@@ -36,6 +37,9 @@ def build_dataset(cfg, default_args=None):
             build_dataset(cfg['dataset'], default_args), cfg['oversample_thr'])
     else:
         dataset = build_from_cfg(cfg, DATASETS, default_args)
+        
+        
+
 
     return dataset
 
@@ -89,10 +93,7 @@ def build_dataloader(dataset,
     if sampler_cfg:
         # shuffle=False when val and test
         sampler_cfg.update(shuffle=shuffle)
-        sampler = build_sampler(
-            sampler_cfg,
-            default_args=dict(
-                dataset=dataset, num_replicas=world_size, rank=rank))
+        sampler_cfg.update(samples_per_gpu=samples_per_gpu)
         sampler = build_sampler(
             sampler_cfg,
             default_args=dict(
@@ -109,7 +110,7 @@ def build_dataloader(dataset,
                 round_up=round_up))
     else:
         sampler = None
-        #sampler=build_sampler(dict(type='ImbalancedDatasetSampler',dataset=dataset))
+
     # If sampler exists, turn off dataloader shuffle
     if sampler is not None:
         shuffle = False
@@ -127,7 +128,7 @@ def build_dataloader(dataset,
 
     if digit_version(torch.__version__) >= digit_version('1.8.0'):
         kwargs['persistent_workers'] = persistent_workers
-
+   
     data_loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -138,6 +139,7 @@ def build_dataloader(dataset,
         shuffle=shuffle,
         worker_init_fn=init_fn,
         **kwargs)
+    
 
     return data_loader
 

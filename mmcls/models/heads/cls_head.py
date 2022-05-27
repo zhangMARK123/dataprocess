@@ -47,6 +47,7 @@ class ClsHead(BaseHead):
         # compute loss
         loss = self.compute_loss(
             cls_score, gt_label, avg_factor=num_samples, **kwargs)
+        # print("==============debug4============")
         if self.cal_acc:
             # compute accuracy
             acc = self.compute_accuracy(cls_score, gt_label)

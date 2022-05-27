@@ -56,6 +56,7 @@ class ImageToTensor(object):
 
     def __call__(self, results):
         for key in self.keys:
+            
             img = results[key]
             if len(img.shape) < 3:
                 img = np.expand_dims(img, -1)
@@ -140,9 +141,9 @@ class Collect(object):
         for key in self.meta_keys:
             if key in results:
                 img_meta[key] = results[key]
-        data['img_metas'] = DC(img_meta, cpu_only=True)
+        data['img_metas'] = DC(img_meta, cpu_only=True)       
         for key in self.keys:
-            data[key] = results[key]
+            data[key] = results[key]     
         return data
 
     def __repr__(self):

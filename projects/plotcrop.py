@@ -46,41 +46,63 @@ def plotcrop(imgpath,labelpath,wpath):
     for obj in labels["objects"]:
         filename=os.path.join(imgpath,obj["data_card_id"],obj["img_info"]["filename"])   
         
+        if obj["ext_occlusion"]==1 or obj["truncation"]==1:
+            continue
+        if obj["toward_orientation"]!=0:
+            continue
+        if not obj["lightboxcolor_head"]:
+            continue
+        if obj["boxcolor"]!=0:
+            continue
+        # if not obj["simplelight_head"] or obj["simplelight"]!=1:
+        #     continue
+        # if not obj["sublightcolor_head"]:
+        #     continue
         img=cv2.imread(filename)  
+        # if not img:
+        #     continue
         bbox=obj["bbox"]
         x1=int(bbox[0])
         y1=int(bbox[1])
         x2=int(bbox[0]+bbox[2])
         y2=int(bbox[1]+bbox[3])       
-        color=(255,255,255)
+        color=(0,123,200)
         cv2.rectangle(img,(x1,y1),(x2,y2),color,1)
         colorlabel=COLOR_CLASSES[obj["boxcolor"]]
         shapelabel=SHAPE_CLASSES[obj["boxshape"]]
-        characterlabel=CHARACTER_CLASSES[obj["characteristic"]]
-        towardlabel=TOWARD_CLASSES[obj["toward_orientation"]]
-        simplelightlabel=SIMPLE_CLASSES[obj["simplelight"]]
+        # characterlabel=CHARACTER_CLASSES[obj["characteristic"]]
+        # towardlabel=TOWARD_CLASSES[obj["toward_orientation"]]
+        # simplelightlabel=SIMPLE_CLASSES[obj["simplelight"]]
 
-        if obj["simplelight_head"]:
-             cv2.putText(img, simplelightlabel, (15, 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+        # if obj["simplelight_head"]:
+        #      cv2.putText(img, simplelightlabel, (15, 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
         if obj["lightboxcolor_head"]:
              cv2.putText(img, colorlabel, (15, 30), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
         if obj["lightboxshape_head"]:
              cv2.putText(img, shapelabel, (15, 45), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
-        if obj["toward_head"]:
-             cv2.putText(img, towardlabel, (15, 60), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
-        if obj["character_head"]:
-           cv2.putText(img, characterlabel, (15, 60), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
-        if not os.path.exists(os.path.join(wpath,obj["data_card_id"],"images")):
-            os.makedirs(os.path.join(wpath,obj["data_card_id"],"images"))   
+        # if obj["toward_head"]:
+        #      cv2.putText(img, towardlabel, (15, 60), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+        # if obj["character_head"]:
+        #    cv2.putText(img, characterlabel, (15, 60), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+
+        # if obj["sublightcolor_head"]:
+        #    cv2.putText(img, COLOR_CLASSES[obj["subcolor0"]], (15, 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+        #    cv2.putText(img, COLOR_CLASSES[obj["subcolor1"]], (15, 30), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+        #    cv2.putText(img, COLOR_CLASSES[obj["subcolor2"]], (15, 45), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+        #    cv2.putText(img, COLOR_CLASSES[obj["subcolor3"]], (15, 60), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+        #    cv2.putText(img, COLOR_CLASSES[obj["subcolor4"]], (15, 75), cv2.FONT_HERSHEY_DUPLEX, 0.5, color)
+        # if not os.path.exists(os.path.join(wpath,obj["data_card_id"],"images")):
+        #     os.makedirs(os.path.join(wpath,obj["data_card_id"],"images"))   
         # if obj["toward_orientation"]==0 or obj["toward_orientation"]==1:
-        if obj["simplelight_head"] and obj["lightboxcolor_head"] and obj["lightboxshape_head"] and  obj["character_head"]:
-            continue
-        if min(bbox[2],bbox[3])<10:
-            cv2.imwrite(os.path.join(wpath,obj["data_card_id"],obj["img_info"]["filename"]),img)
+        # if obj["simplelight_head"] and obj["lightboxcolor_head"] and obj["lightboxshape_head"] and  obj["character_head"]:
+        #     continue
+        
+        if min(bbox[2],bbox[3])>10:
+            cv2.imwrite(os.path.join(wpath,obj["img_info"]["filename"].split('/')[-1]),img)
     
 
-imgpath="/share/zbh/Datasets/2022_Q1_icu30_new_crop2_correct/"
-labelpath="/share/zbh/Datasets/2022_Q1_icu30_new_crop_correct4_zs_test.json"
-wpath="/share/zbh/Datasets/wpath/simplelight"
+imgpath="/disk3/zbh/Datasets/2022_Q1_icu30_crop/"
+labelpath="/disk3/zbh/Datasets/2022_Q1_icu30_train.json"
+wpath="/disk3/zs1/2022_Q1_icu30_crop_labeled2/color/red/"
 
 plotcrop(imgpath,labelpath,wpath)

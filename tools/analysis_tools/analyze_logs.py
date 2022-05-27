@@ -60,6 +60,7 @@ def plot_phase_train(metric, log_dict, epochs, curve_label, json_log):
     xs, ys = [], []
     for epoch in epochs:
         iters = log_dict[epoch]['iter']
+        # print(iters)
         if log_dict[epoch]['mode'][-1] == 'val':
             iters = iters[:-1]
         num_iters_per_epoch = iters[-1]
@@ -68,8 +69,14 @@ def plot_phase_train(metric, log_dict, epochs, curve_label, json_log):
             'interval of log in config file.')
         xs.append(np.array(iters) / num_iters_per_epoch + (epoch - 1))
         ys.append(np.array(log_dict[epoch][metric][:len(iters)]))
+        # print("xs",xs[-1].shape)
+        # print("ys",ys[-1].shape)
+        # print("xs",xs[-1][0])
     xs = np.concatenate(xs)
     ys = np.concatenate(ys)
+    # print(len(xs))
+    # print(len(ys))
+    # print(type(xs[0]))
     plt.xlabel('Epochs')
     plt.plot(xs, ys, label=curve_label, linewidth=0.75)
 
@@ -113,9 +120,11 @@ def plot_curve(log_dicts, args):
         print("Attention: The plot style won't be applied because 'seaborn' "
               'package is not installed, please install it if you want better '
               'show style.')
-
+    # print(log_dicts)
+    # print(args)
     # set plot window size
     wind_w, wind_h = args.window_size.split('*')
+    # wind_w, wind_h = 12,7
     wind_w, wind_h = int(wind_w), int(wind_h)
     plt.figure(figsize=(wind_w, wind_h))
 

@@ -122,6 +122,7 @@ def retrieve_data_cfg(config_path, skip_type, cfg_options, phase):
     data_cfg = cfg.data[phase]
     while 'dataset' in data_cfg:
         data_cfg = data_cfg['dataset']
+    # print(data_cfg.pipeline)
     data_cfg['pipeline'] = [
         x for x in data_cfg.pipeline if x['type'] not in skip_type
     ]
@@ -218,7 +219,7 @@ def main():
                             args.phase)
 
     dataset, pipeline = build_dataset_pipeline(cfg, args.phase)
-    CLASSES = dataset.CLASSES
+    CLASSES = dataset.SHAPE_CLASSES
     display_number = min(args.number, len(dataset))
     progressBar = ProgressBar(display_number)
 
@@ -236,7 +237,7 @@ def main():
                 src_path = item.get('filename', '{}.jpg'.format(i))
                 dist_path = os.path.join(args.output_dir, Path(src_path).name)
 
-            infos = dict(label=CLASSES[item['gt_label']])
+            infos = dict(label=CLASSES[item["boxshape"]])
 
             ret, _ = manager.put_img_infos(
                 image,

@@ -101,10 +101,13 @@ class FocalLoss(nn.Module):
             torch.Tensor: Loss.
         """
         assert reduction_override in (None, 'none', 'mean', 'sum')
+
         reduction = (
             reduction_override if reduction_override else self.reduction)
+        # print(target.shape)
         if target.dim() == 1 or (target.dim() == 2 and target.shape[1] == 1):
             target = convert_to_one_hot(target.view(-1, 1), pred.shape[-1])
+        
         loss_cls = self.loss_weight * sigmoid_focal_loss(
             pred,
             target,

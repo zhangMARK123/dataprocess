@@ -3,8 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..builder import LOSSES
-from .utils import weight_reduce_loss
-
+from .utils import weight_reduce_loss,convert_to_one_hot
 
 def cross_entropy(pred,
                   label,
@@ -29,8 +28,12 @@ def cross_entropy(pred,
         torch.Tensor: The calculated loss
     """
     # element-wise losses
+    # print(label.shape)
+    # print("===========")
+    # print(pred.shape)
+    label=label.squeeze()
     loss = F.cross_entropy(pred, label, weight=class_weight, reduction='none')
-
+    
     # apply weights and do the reduction
     if weight is not None:
         weight = weight.float()
@@ -197,7 +200,13 @@ class CrossEntropyLoss(nn.Module):
             kwargs.update({'pos_weight': pos_weight})
         else:
             pos_weight = None
-
+        
+        # ###add by zs
+        # if label.dim() == 1 or (label.dim() == 2 and label.shape[1] == 1):
+        #     label = convert_to_one_hot(label.view(-1, 1), cls_score.shape[-1])
+        
+        
+        
         loss_cls = self.loss_weight * self.cls_criterion(
             cls_score,
             label,

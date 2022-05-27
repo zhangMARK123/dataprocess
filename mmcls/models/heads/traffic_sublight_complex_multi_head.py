@@ -33,9 +33,9 @@ class TrafficSubLightcomplexMultiClsHead(ClsHead):
         self.shape_classes = shape_classes
         self.color_classes = color_classes
         self.toward_classes = toward_classes
-        self.character_classes=character_classes
-        self.simplelight_classes=simplelight_classes
-        
+        self.character_classes = character_classes
+        self.simplelight_classes = simplelight_classes
+
         if self.shape_classes <= 0:
             raise ValueError(
                 f'num_classes={shape_classes} must be a positive integer')
@@ -54,14 +54,14 @@ class TrafficSubLightcomplexMultiClsHead(ClsHead):
         self.fc_shape = nn.Linear(self.in_channels, self.shape_classes)
         self.fc_color = nn.Linear(self.in_channels, self.color_classes)
         self.fc_toward = nn.Linear(self.in_channels, self.toward_classes)
-        self.fc_character=nn.Linear(self.in_channels,self.character_classes)
-        self.fc_simplelight=nn.Linear(self.in_channels,self.simplelight_classes)
-        print("fc_shape:",self.fc_shape)
+        self.fc_character = nn.Linear(self.in_channels, self.character_classes)
+        self.fc_simplelight = nn.Linear(self.in_channels, self.simplelight_classes)
+        # print("fc_shape:", self.fc_shape)
         self.freeze_color_head = freeze_color_head
         self.freeze_shape_head = freeze_shape_head
         self.freeze_toward_head = freeze_toward_head
-        self.freeze_character_head=freeze_character_head
-        self.freeze_simplelight_head=freeze_simplelight_head
+        self.freeze_character_head = freeze_character_head
+        self.freeze_simplelight_head = freeze_simplelight_head
         if self.freeze_color_head and self.freeze_shape_head and self.freeze_toward_head and self.freeze_simplelight_head:
             raise ValueError(
                 'can not freeze all head at the same time.')
@@ -74,8 +74,8 @@ class TrafficSubLightcomplexMultiClsHead(ClsHead):
         color_cls_score = self.fc_color(x)
         shape_cls_score = self.fc_shape(x)
         toward_cls_score = self.fc_toward(x)
-        character_cls_score=self.fc_character(x)
-        simplelight_cls_score=self.fc_simplelight(x)
+        character_cls_score = self.fc_character(x)
+        simplelight_cls_score = self.fc_simplelight(x)
         if isinstance(color_cls_score, list):
             color_cls_score = sum(color_cls_score) / float(len(color_cls_score))
         if isinstance(shape_cls_score, list):
@@ -89,11 +89,11 @@ class TrafficSubLightcomplexMultiClsHead(ClsHead):
         color_pred = F.softmax(color_cls_score, dim=1) if color_cls_score is not None else None
         shape_pred = F.softmax(shape_cls_score, dim=1) if shape_cls_score is not None else None
         toward_pred = F.softmax(toward_cls_score, dim=1) if shape_cls_score is not None else None
-        character_pred=F.softmax(character_cls_score, dim=1) if character_cls_score is not None else None
-        simplelight_pred=F.softmax(simplelight_cls_score, dim=1) if simplelight_cls_score is not None else None
+        character_pred = F.softmax(character_cls_score, dim=1) if character_cls_score is not None else None
+        simplelight_pred = F.softmax(simplelight_cls_score, dim=1) if simplelight_cls_score is not None else None
         on_trace = is_tracing()
         if torch.onnx.is_in_onnx_export() or on_trace:
-            return [color_pred, shape_pred, toward_pred,character_pred,simplelight_pred]
+            return [color_pred, shape_pred, toward_pred, character_pred, simplelight_pred]
         pred = np.concatenate((color_pred.detach().cpu().numpy(),
                                shape_pred.detach().cpu().numpy(),
                                toward_pred.detach().cpu().numpy(),
@@ -102,16 +102,15 @@ class TrafficSubLightcomplexMultiClsHead(ClsHead):
                                ), axis=1)
         return pred
 
-    def forward_train(self, x, **kwargs):
+    def forward_train(self, x, **kwargs):                                 
         if isinstance(x, tuple):
             x = x[-1]
         color_cls_score = self.fc_color(x)
         shape_cls_score = self.fc_shape(x)
         toward_cls_score = self.fc_toward(x)
-        character_cls_score=self.fc_character(x)
+        character_cls_score = self.fc_character(x)
+        simplelight_cls_score = self.fc_simplelight(x)
 
-        simplelight_cls_score=self.fc_simplelight(x)
-        
         losses = dict()
         # compute loss
         color_score_selected = color_cls_score[torch.squeeze(kwargs["lightboxcolor_head"] == 1)]
@@ -122,17 +121,22 @@ class TrafficSubLightcomplexMultiClsHead(ClsHead):
         shape_gt_selected = kwargs['boxshape'][torch.squeeze(kwargs['lightboxshape_head'] == 1)]
         shape_loss = self.compute_loss(shape_score_selected, shape_gt_selected, avg_factor=len(shape_score_selected))
 
+        
+
         toward_score_selected = toward_cls_score[torch.squeeze(kwargs['toward_head'] == 1)]
         toward_gt_selected = kwargs['toward_orientation'][torch.squeeze(kwargs['toward_head'] == 1)]
-        toward_loss = self.compute_loss(toward_score_selected, toward_gt_selected, avg_factor=len(toward_score_selected))
+        toward_loss = self.compute_loss(toward_score_selected, toward_gt_selected,
+                                        avg_factor=len(toward_score_selected))
 
         character_score_selected = character_cls_score[torch.squeeze(kwargs['character_head'] == 1)]
         character_gt_selected = kwargs['characteristic'][torch.squeeze(kwargs['character_head'] == 1)]
-        character_loss = self.compute_loss(character_score_selected, character_gt_selected, avg_factor=len(character_score_selected))
+        character_loss = self.compute_loss(character_score_selected, character_gt_selected,
+                                           avg_factor=len(character_score_selected))
 
         simplelight_score_selected = simplelight_cls_score[torch.squeeze(kwargs['simplelight_head'] == 1)]
         simplelight_gt_selected = kwargs['simplelight'][torch.squeeze(kwargs['simplelight_head'] == 1)]
-        simplelight_loss = self.compute_loss(simplelight_score_selected, simplelight_gt_selected, avg_factor=len(simplelight_score_selected))
+        simplelight_loss = self.compute_loss(simplelight_score_selected, simplelight_gt_selected,
+                                             avg_factor=len(simplelight_score_selected))
 
         if self.cal_acc:
             # compute accuracy
@@ -176,10 +180,10 @@ class TrafficSubLightcomplexMultiClsHead(ClsHead):
         if not self.freeze_toward_head:
             losses['toward_loss'] = {'toward_loss': toward_loss}
         if not self.freeze_character_head:
-            losses['character_loss']={'character_loss':character_loss}
+            losses['character_loss'] = {'character_loss': character_loss}
         if not self.freeze_simplelight_head:
-            losses['simplelight_loss']={'simplelight_loss':simplelight_loss}
-        
+            losses['simplelight_loss'] = {'simplelight_loss': simplelight_loss}
+
         return losses
 
     def train(self, mode=True):

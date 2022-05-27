@@ -11,6 +11,8 @@ from mmcls.datasets.pipelines import Compose
 from mmcls.models import build_classifier
 
 
+
+
 def init_model(config, checkpoint=None, device='cuda:0', options=None):
     """Initialize a classifier from config file.
 
@@ -88,7 +90,67 @@ def inference_model(model, img):
         result = {'pred_label': pred_label, 'pred_score': float(pred_score)}
     result['pred_class'] = model.CLASSES[result['pred_label']]
     return result
+def inference_sublightmodel(model, img):
+    """Inference image(s) with the classifier.
 
+    Args:
+        model (nn.Module): The loaded classifier.
+        img (str/ndarray): The image filename or loaded image.
+
+    Returns:
+        result (dict): The classification results that contains
+            `class_name`, `pred_label` and `pred_score`.
+    """
+    cfg = model.cfg
+    device = next(model.parameters()).device  # model device
+    # build the data pipeline
+    if isinstance(img, str):
+        if cfg.data.test.pipeline[0]['type'] != 'LoadImageFromFile':
+            cfg.data.test.pipeline.insert(0, dict(type='LoadImageFromFile'))
+        data = dict(img_info=dict(filename=img), img_prefix=None)
+    else:
+        if cfg.data.test.pipeline[0]['type'] == 'LoadImageFromFile':
+            cfg.data.test.pipeline.pop(0)
+        data = dict(img=img)
+    test_pipeline = Compose(cfg.data.test.pipeline)
+    data = test_pipeline(data)
+    data = collate([data], samples_per_gpu=1)
+    if next(model.parameters()).is_cuda:
+        # scatter to specified GPU
+        data = scatter(data, [device])[0]
+    result_output={}
+    # forward the model
+    with torch.no_grad():
+        result = model(return_loss=False, **data)
+        scores = np.vstack(result)
+        
+        color_scores = scores[:, :6]
+        pred_color_score = np.max(color_scores, axis=1)
+        pred_color_label = np.argmax(color_scores, axis=1)
+        shape_scores = scores[:, 6:14]
+        pred_shape_score = np.max(shape_scores, axis=1)
+        pred_shape_label = np.argmax(shape_scores, axis=1)
+        toward_scores = scores[:, 14:18]
+        pred_toward_score = np.max(toward_scores, axis=1)
+        pred_toward_label = np.argmax(toward_scores, axis=1)
+        character_scores = scores[:, 18:-2]
+        pred_character_score = np.max(character_scores, axis=1)
+        pred_character_label = np.argmax(character_scores, axis=1)      
+        simplelight_scores = scores[:, -2:]
+        pred_simplelight_score = np.max(simplelight_scores, axis=1)
+        pred_simplelight_label = np.argmax(simplelight_scores, axis=1)       
+        
+        result_output["score_color_pred"] = pred_color_score
+        result_output["label_color_pred"] = pred_color_label            
+        result_output["score_shape_pred"] = pred_shape_score
+        result_output["label_shape_pred"] = pred_shape_label   
+        result_output["score_toward_pred"] = pred_toward_score
+        result_output["label_toward_pred"] = pred_toward_label  
+        result_output["score_character_pred"] = pred_character_score
+        result_output["label_character_pred"] = pred_character_label                        
+        result_output["score_simplelight_pred"] = pred_simplelight_score
+        result_output["label_simplelight_pred"] = pred_simplelight_label    
+    return result_output
 
 def show_result_pyplot(model,
                        img,

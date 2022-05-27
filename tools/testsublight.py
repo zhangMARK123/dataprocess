@@ -11,7 +11,7 @@ from mmcv import DictAction
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import get_dist_info, init_dist, load_checkpoint
 
-from mmcls.apis import multi_gpu_test, single_gpu_test,single_gpu_test_sublights
+from mmcls.apis import multi_gpu_test, single_gpu_test, single_gpu_test_sublights,single_gpu_test_sublights2
 from mmcls.datasets import build_dataloader, build_dataset
 from mmcls.models import build_classifier
 
@@ -36,18 +36,18 @@ def parse_args():
         default=['all'],
         choices=out_options + ['none', 'all'],
         help='Besides metrics, what items will be included in the output '
-        f'result file. You can choose some of ({", ".join(out_options)}), '
-        'or use "all" to include all above, or use "none" to disable all of '
-        'above. Defaults to output all.',
+             f'result file. You can choose some of ({", ".join(out_options)}), '
+             'or use "all" to include all above, or use "none" to disable all of '
+             'above. Defaults to output all.',
         metavar='')
     parser.add_argument(
         '--metrics',
         type=str,
         nargs='+',
         help='evaluation metrics, which depends on the dataset, e.g., '
-        '"accuracy", "precision", "recall", "f1_score", "support" for single '
-        'label dataset, and "mAP", "CP", "CR", "CF1", "OP", "OR", "OF1" for '
-        'multi-label dataset')
+             '"accuracy", "precision", "recall", "f1_score", "support" for single '
+             'label dataset, and "mAP", "CP", "CR", "CF1", "OP", "OR", "OF1" for '
+             'multi-label dataset')
     parser.add_argument('--show', action='store_true', help='show results')
     parser.add_argument(
         '--show-dir', help='directory where painted images will be saved')
@@ -61,32 +61,32 @@ def parse_args():
         nargs='+',
         action=DictAction,
         help='override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file. If the value to '
-        'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
-        'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
-        'Note that the quotation marks are necessary and that no white space '
-        'is allowed.')
+             'in xxx=yyy format will be merged into config file. If the value to '
+             'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
+             'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
+             'Note that the quotation marks are necessary and that no white space '
+             'is allowed.')
     parser.add_argument(
         '--options',
         nargs='+',
         action=DictAction,
         help='override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file (deprecate), '
-        'change to --cfg-options instead.')
+             'in xxx=yyy format will be merged into config file (deprecate), '
+             'change to --cfg-options instead.')
     parser.add_argument(
         '--metric-options',
         nargs='+',
         action=DictAction,
         default={},
         help='custom options for evaluation, the key-value pair in xxx=yyy '
-        'format will be parsed as a dict metric_options for dataset.evaluate()'
-        ' function.')
+             'format will be parsed as a dict metric_options for dataset.evaluate()'
+             ' function.')
     parser.add_argument(
         '--show-options',
         nargs='+',
         action=DictAction,
         help='custom options for show_result. key-value pair in xxx=yyy.'
-        'Check available options in `model.show_result`.')
+             'Check available options in `model.show_result`.')
     parser.add_argument(
         '--launcher',
         choices=['none', 'pytorch', 'slurm', 'mpi'],
@@ -169,8 +169,10 @@ def main():
             model = MMDataParallel(model, device_ids=[0])
         model.CLASSES = CLASSES
         show_kwargs = {} if args.show_options is None else args.show_options
-        outputs= single_gpu_test_sublights(model, data_loader, args.show, args.show_dir,args.out,
-                                  **show_kwargs)
+        if not os.path.exists(args.show_dir):
+            os.makedirs(args.show_dir)
+        outputs = single_gpu_test_sublights(model, data_loader, args.show, args.show_dir, args.out,
+                                            **show_kwargs)
     else:
         model = MMDistributedDataParallel(
             model.cuda(),
@@ -194,7 +196,6 @@ def main():
                 else:
                     raise ValueError(f'Unsupport metric type: {type(v)}')
                 print(f'\n{k} : {v}')
-       
 
 
 if __name__ == '__main__':
