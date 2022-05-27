@@ -1,0 +1,192 @@
+import numpy as np
+import onnx
+import onnxruntime as rt
+import pandas as pd
+import argparse
+import os,re
+import subprocess
+import csv
+import datetime
+import time
+
+
+def run_on_onnxruntime(onnx_model,input_raw_file):
+    model = onnx.load(onnx_model)
+    #get information of input
+    input_info = model.graph.input
+    input_name_shape = {}
+    input_name_raw_file = {}
+    for i in range(len(input_raw_file)):
+        item = input_info[i]
+        name = item.name
+        shape = []
+        for cc in item.type.tensor_type.shape.dim:
+            value = cc.dim_value
+            shape.append(value)
+        input_name_shape[name] = shape
+        input_name_raw_file[name] = input_raw_file[i]
+    
+    #get information of output
+    output_info = model.graph.output
+    output_name_set = []
+    for item in output_info:
+        output_name_set.append(item.name)
+    
+    input_name_ndarray = {}
+    for name, shape in input_name_shape.items():
+        raw_file = input_name_raw_file[name]
+        input_array = np.fromfile(raw_file, dtype=np.float32).reshape(tuple(shape))
+        input_name_ndarray[name] = input_array
+
+    sess = rt.InferenceSession(onnx_model)
+    result = sess.run(output_name_set, input_name_ndarray)
+
+    for i in range(len(output_name_set)):
+        result[i].tofile("onnx_raw_result/{}.raw".format(output_name_set[i]))
+    
+    return output_name_set
+
+
+
+def gen_yaml_file(model_path, input_list):
+    gen_cmd = "/opt/qti-aic/exec/qaic-exec -m={}  -run-on-interpreter  -dump-profile=./temp.yaml  -input-list-file={}".format(model_path, input_list)
+    os.system(gen_cmd)
+
+
+def extract_input_raw_path(input_list):
+    f = open(input_list)
+    raws = f.readline()
+    raws = raws.strip()
+    input_raw_file = raws.split(",")
+    return input_raw_file
+
+
+
+def compile_for_qaic(cmd):
+    os.system(cmd)
+
+def run_cmd(cmd, timeout=100): 
+    p = subprocess.Popen(cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True) 
+    t_beginning = time.time() 
+    seconds_passed = 0 
+    while True: 
+        if p.poll() is not None: 
+            break 
+        seconds_passed = time.time() - t_beginning 
+        if timeout and seconds_passed > timeout: 
+            p.terminate() 
+            #print("timeout", cmd)
+            return "timeout"
+            #raise TimeoutError(cmd, timeout) 
+        time.sleep(0.1) 
+    return p.stdout.read() 
+
+def get_performance(cmd):
+    res = run_cmd(cmd)
+    if res == "timeout":
+        fps = "timeout"
+    else:
+        sub_str = str(res[-15:])
+        #fps = (res[-10:-1].strip())
+        fps = re.search("\d+(\.\d+)?", sub_str).group()
+    return fps
+
+def get_accuracy(onnx_result_path, qaic_result_path, output_name_set):
+    accu_cos_dict = {}
+    accu_rme_dict = {}
+    for item in output_name_set:
+        for raw_file in os.listdir(onnx_result_path):
+            for bin_file in os.listdir(qaic_result_path):
+                if item in raw_file and item in bin_file:
+                    cosine_match_percent = cos_metric(os.path.join(onnx_result_path, raw_file), os.path.join(qaic_result_path, bin_file))
+                    rme_match_percent = rme_metric(os.path.join(onnx_result_path, raw_file), os.path.join(qaic_result_path, bin_file))
+                    accu_cos_dict[item] = cosine_match_percent
+                    accu_rme_dict[item] = rme_match_percent
+    
+    return accu_cos_dict, accu_rme_dict
+
+
+def cos_metric(raw_1, raw_2):
+    data1 = np.fromfile(raw_1, 'float32').astype('float32')
+    data2 = np.fromfile(raw_2, 'float32').astype('float32')
+    data1 = data1.flatten()
+    data2 = data2.flatten()
+
+    data1 = np.around(data1, decimals=5)
+    data2 = np.around(data2, decimals=5)
+    cosine_similarity = np.dot(data2,data1)/(np.linalg.norm(data2)*np.linalg.norm(data1))
+    match_percent = (1+cosine_similarity)/2 * 100 #Mapping cos similarity to percentage.
+
+    return match_percent
+
+def rme_metric(raw_1, raw_2):
+    data1 = np.fromfile(raw_1, 'float32').astype('float32')
+    data2 = np.fromfile(raw_2, 'float32').astype('float32')
+    data1 = data1.flatten()
+    data2 = data2.flatten()
+
+        # finds the root mean square error between op1 and op2
+    rmse = np.linalg.norm(data2 - data1) / np.sqrt(len(data1))
+    match_percent = 100 - rmse
+    if match_percent < 0:
+        match_percent = 0.0
+
+    return match_percent
+
+
+def visualize(cos, rme, output_name_set):
+    f = open("one_shot.csv", 'w')
+    writer = csv.writer(f)
+    row = ["O/P Name", "cos", "rme"]
+    writer.writerow(row)
+    for out_name in output_name_set:
+        test_res = [out_name] + [str(cos[out_name])] + [str(rme[out_name])]
+        writer.writerow(test_res)
+    f.close()
+    df = pd.DataFrame(pd.read_csv('one_shot.csv'))
+    print(str(df))
+
+
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='check performance and accuracy for the command that generated by MODEL CFG')
+    parser.add_argument('-m', '--model',
+                        help='an onnx model', required=True)
+    parser.add_argument('-t', '--input_list',
+                        help=' input-list', required=True)
+    parser.add_argument('-c', '--compile_command',
+                        help=' a compile command', required=True)
+    args = parser.parse_args()
+    os.system("mkdir onnx_raw_result")
+    os.system("rm -rf model_int8_bin")
+    model_path = args.model
+    input_list = args.input_list
+    compile_cmd = args.compile_command
+    performance_cmd = "/opt/qti-aic/exec/qaic-runner -t ./model_int8_bin -n 100"
+
+    print("input_list: ", input_list)
+    input_raw_file = extract_input_raw_path(input_list)
+    print("input_raw_file: ", input_raw_file)
+    sub_cmd = ""
+    for item in input_raw_file:
+        sub_cmd += " -i " + item + " "
+    qaic_result_cmd = "/opt/qti-aic/exec/qaic-runner -t ./model_int8_bin" + sub_cmd + "--write-output-start-iter 1 --write-output-num-samples 1 --write-output-dir ./qaic_out_bin -n 3"
+    #os.system(qaic_result_cmd)
+
+    output_name_set = run_on_onnxruntime(model_path, input_raw_file)
+    gen_yaml_file(model_path, input_list)
+    compile_for_qaic(compile_cmd)
+    fps = get_performance(performance_cmd)
+    os.system(qaic_result_cmd)
+    accuracy_cos, accuracy_rme = get_accuracy("onnx_raw_result", "qaic_out_bin", output_name_set)
+    print("############### Performance&Accuracy data #################")
+    print("FPS: ", fps)
+    visualize(accuracy_cos, accuracy_rme, output_name_set)
+
+
+
+
+if __name__ == '__main__':
+    main()
